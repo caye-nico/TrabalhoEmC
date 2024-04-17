@@ -13,7 +13,6 @@ void clearFileContent(FILE *file) {
     }
     rewind(file);
 }
-
 void displayHexAscii(FILE *file, long cursorPosition, int topRow) {
     unsigned char matriz[ROWS][COLS];
     unsigned char aux;
@@ -33,9 +32,7 @@ void displayHexAscii(FILE *file, long cursorPosition, int topRow) {
     }
 
     rewind(file);
-
     system("cls");
-
     printf("\n\n");
 
     for (int i = 0; i < ROWS; i++) {
@@ -148,10 +145,6 @@ int main(void) {
             displayHexAscii(file, cursorPosition, topRow);
         }
     } while (1);
-
     fclose(file);
-
     return 0;
-
-
     }
