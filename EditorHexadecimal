@@ -48,7 +48,7 @@ void displayHexAscii(FILE *file, long cursorPosition, int topRow) {
             if (isprint(matriz[i][j]))
                 printf("%c", matriz[i][j]);
             else
-                printf(".");
+                printf("_");
         }
         printf("\n");
     }
