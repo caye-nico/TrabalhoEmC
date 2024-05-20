@@ -1,92 +1,107 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
-#include <ctype.h>
 
 #define COLS 16
 #define ROWS 24
 
+// Define as cores ANSI para destaque
+#define BLUE_BACKGROUND "\x1b[44m"
+#define RESET_COLOR "\x1b[0m"
+
 void clearFileContent(FILE *file) {
-    fseek(file, 0, SEEK_SET);
+    // Limpa todo o conteúdo do arquivo, preenchendo-o com zeros
+    fseek(file, 0, SEEK_SET); // Move para o início do arquivo
     for (int i = 0; i < ROWS * COLS; i++) {
-        fputc(0, file);
+        fputc(0, file); // Escreve zeros em cada posição do arquivo
     }
-    rewind(file);
+    fflush(file);
+    rewind(file); // Volta para o início do arquivo
 }
-void displayHexAscii(FILE *file, long cursorPosition, int topRow) {
-    unsigned char matriz[ROWS][COLS];
+
+void displayOptions() {
+    printf("\nUse 'Backspace' para limpar tudo e salvar, 'w' para salvar, 'Esc' para retornar ao editor.\n");
+}
+
+void displayHexAscii(FILE *file, long cursorPosition) {
+    unsigned char matriz[ROWS][COLS] = {0};
     unsigned char aux;
     unsigned char l =  0;
     unsigned char c =  0;
 
-    fseek(file, topRow * COLS, SEEK_SET);
-
-    while (l < ROWS && !feof(file)) {
-        fread(&aux, 1, 1, file);
+    // Lê o conteúdo do arquivo e exibe em hexadecimal e ASCII
+    while (!feof(file) && fread(&aux, 1, 1, file) == 1) {
         matriz[l][c] = aux;
         c++;
         if (c >= COLS) {
             c = 0;
             l++;
+            if (l >= ROWS) {
+                break;
+            }
         }
     }
 
     rewind(file);
-    system("cls");
-    printf("\n\n");
 
-    for (int i = 0; i < ROWS; i++) {
-        printf(" ");
-        for (int j = 0; j < COLS; j++) {
-            printf("%02X ", matriz[i][j]);
+    for (aux = 0; aux < 24; aux++) {
+        printf("\n\n");
+    }
+
+    int initialRow = (24 - ROWS) / 2;
+
+    for (l = 0; l < ROWS; l++) {
+        printf("\n%20s", "");
+        for (c = 0; c < COLS; c++) {
+            if (l * COLS + c == cursorPosition) {
+                printf(BLUE_BACKGROUND "%02x " RESET_COLOR, matriz[l][c]); // Destaque a posição do cursor
+            } else {
+                printf("%02x ", matriz[l][c]);
+            }
         }
-        printf(" ");
-        for (int j = 0; j < COLS; j++) {
-            if (isprint(matriz[i][j]))
-                printf("%c", matriz[i][j]);
-            else
-                printf("_");
+        printf("   ");
+        for (c = 0; c < COLS; c++) {
+            if (matriz[l][c] < 32 || matriz[l][c] > 126) {
+                if (l * COLS + c == cursorPosition) {
+                    printf(BLUE_BACKGROUND "." RESET_COLOR);
+                } else {
+                    printf(".");
+                }
+            } else {
+                if (l * COLS + c == cursorPosition) {
+                    printf(BLUE_BACKGROUND "%c" RESET_COLOR, matriz[l][c]);
+                } else {
+                    printf("%c", matriz[l][c]);
+                }
+            }
         }
         printf("\n");
     }
 
     printf("\n%20s", "");
-    for (int j = 0; j < COLS; j++) {
-        printf("%02d ", j);
+    for (c = 0; c < COLS; c++) {
+        printf("%02d ", c);
     }
 
-    printf("\n\nPosição do cursor: %04X (%ld)\n", cursorPosition, cursorPosition);
+    printf("\n\nCursor position: %ld", cursorPosition);
 }
 
-void readFile(FILE *file) {
-    fseek(file, 0, SEEK_END);
-    long fileSize = ftell(file);
-    rewind(file);
-
-    char *buffer = (char *)malloc(fileSize);
-    if (buffer == NULL) {
-        printf("Falha na alocação de memória\n");
-        exit(1);
+void refreshDisplay(FILE *file, long cursorPosition, int inOptionsMenu) {
+    system("cls"); // Limpa a tela
+    displayHexAscii(file, cursorPosition); // Exibe o conteúdo do arquivo e a posição do cursor
+    if (inOptionsMenu) {
+        displayOptions(); // Exibe as opções se estiver no menu de opções
+    } else {
+        printf("\n\n    Use as setas para mover o cursor                                      Aperte 'Esc' para exibir o menu de opcoes.\n");
     }
-
-    fread(buffer, sizeof(char), fileSize, file);
-    printf("Conteúdo do arquivo:\n%s\n", buffer);
-
-    free(buffer);
 }
 
 int main(void) {
     FILE *file;
     char filename[100];
     long cursorPosition = 0;
-    int topRow = 0;
 
-    printf("\n\nOpcoes:\n");
-    printf("1. Limpar\n");
-    printf("2. Salvar\n");
-    printf("3. Ler\n");
-
-    printf("\nDigite o local do arquivo: ");
+    printf("Entre com o nome do arquivo: ");
     scanf("%s", filename);
 
     if ((file = fopen(filename, "r+")) == NULL) {
@@ -94,57 +109,71 @@ int main(void) {
         return -1;
     }
 
-    displayHexAscii(file, cursorPosition, topRow);
-
-    printf("\n\n'Tab' para salvar alteracoes, 'Ctrl' para ler o conteudo do arquivo, 'Backspace' para limpar o conteudo do arquivo e 'Enter' para sair sem salvar.\n");
+    refreshDisplay(file, cursorPosition, 0);
 
     int ch;
+    int inOptionsMenu = 0;
+
     do {
         ch = getch();
 
-        if (ch == 224) {
-            ch = getch();
-            switch(ch) {
-                case 72: // Seta para cima
-                    if (cursorPosition >= COLS)
-                        cursorPosition -= COLS;
-                    else if (topRow > 0)
-                        topRow--;
-                    break;
-                case 80: // Seta para baixo
-                    if (cursorPosition < ROWS * COLS - COLS)
-                        cursorPosition += COLS;
-                    else if (topRow < ROWS - 1)
-                        topRow++;
-                    break;
-                case 75: // Seta para a esquerda
-                    if (cursorPosition > 0)
-                        cursorPosition--;
-                    break;
-                case 77: // Seta para a direita
-                    if (cursorPosition < ROWS * COLS - 1)
-                        cursorPosition++;
-                    break;
+        if (inOptionsMenu) {
+            if (ch == 'w') {
+                fflush(file); // Salva o conteúdo do arquivo
+                printf("\nAlteracoes salvas. Saindo...\n");
+                fclose(file);
+                return 0;
+            } else if (ch == 8) { // Tecla Backspace
+                clearFileContent(file); // Limpa o conteúdo do arquivo
+                fflush(file); // Salva as mudanças
+                printf("\nArquivo limpo e alteracoes salvas. Saindo...\n");
+                fclose(file);
+                return 0;
+            } else if (ch == 13) { // Tecla Enter
+                printf("\nSaindo sem salvar...\n");
+                fclose(file);
+                return 0;
+            } else if (ch == 27) { // Tecla Escape novamente para sair do menu
+                inOptionsMenu = 0;
+                refreshDisplay(file, cursorPosition, inOptionsMenu);
             }
+        } else {
+            if (ch == 224) { // Se o código de tecla for 224, é uma tecla especial (seta)
+                ch = getch(); // Lê a segunda parte do código de tecla especial
+                switch(ch) {
+                    case 72: // Tecla de seta para cima
+                        cursorPosition -= COLS;
+                        break;
+                    case 80: // Tecla de seta para baixo
+                        cursorPosition += COLS;
+                        break;
+                    case 75: // Tecla de seta para esquerda
+                        cursorPosition--;
+                        break;
+                    case 77: // Tecla de seta para direita
+                        cursorPosition++;
+                        break;
+                }
+                if (cursorPosition < 0) // Garante que o cursor não ultrapasse os limites do arquivo
+                    cursorPosition = 0;
+                if (cursorPosition >= ROWS * COLS)
+                    cursorPosition = ROWS * COLS - 1;
 
-            displayHexAscii(file, cursorPosition, topRow);
-        } else if (ch == 9) { // Tecla 'Tab'
-            printf("\nSalvando alterações e saindo...\n");
-            break;
-        } else if (ch == 3) { // Tecla 'Ctrl'
-            printf("\nLendo o conteúdo do arquivo...\n");
-            readFile(file);
-            displayHexAscii(file, cursorPosition, topRow);
-        } else if (ch == 13) { // Tecla 'Enter'
-            printf("\nSaindo sem salvar...\n");
-            break;
-        } else if (isprint(ch)) {
-            fseek(file, cursorPosition, SEEK_SET);
-            fputc(ch, file);
-            cursorPosition++;
-            displayHexAscii(file, cursorPosition, topRow);
+                refreshDisplay(file, cursorPosition, inOptionsMenu);
+            } else if (ch == 27) { // Tecla Escape
+                inOptionsMenu = 1;
+                refreshDisplay(file, cursorPosition, inOptionsMenu);
+            } else {
+                fseek(file, cursorPosition, SEEK_SET); // Posiciona o cursor no arquivo
+                fputc(ch, file); // Escreve o caractere no arquivo
+                fflush(file);
+                rewind(file); // Volta para o início do arquivo
+                refreshDisplay(file, cursorPosition, inOptionsMenu); // Atualiza a exibição
+            }
         }
     } while (1);
+
     fclose(file);
+
     return 0;
-    }
+}
